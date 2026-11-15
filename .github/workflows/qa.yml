@@ -1,21 +1,18 @@
 name: QA game maps
+# Website quản lý (Cloudflare Worker) kích hoạt workflow này: theo lịch hoặc khi bấm "Chạy ngay".
 
 on:
-  schedule:
-    - cron: "17 1 * * *"     # 08:17 giờ VN mỗi ngày
   workflow_dispatch:
     inputs:
       count:
         description: "Số lượt chạy (1-20)"
         default: "20"
+      api:
+        description: "Địa chỉ website quản lý (website tự điền)"
+        default: ""
       selftest:
-        description: "Chạy thử với trang mẫu trong repo (không đụng game thật)"
-        type: boolean
-        default: false
-
-permissions:
-  contents: write
-  issues: write
+        description: "Chạy với trang mẫu trong repo"
+        default: "false"
 
 concurrency: qa-game-maps
 
@@ -24,22 +21,15 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ids: ${{ steps.m.outputs.ids }}
-      skip: ${{ steps.m.outputs.skip }}
     steps:
-      - uses: actions/checkout@v4
       - id: m
         run: |
-          N="${{ github.event.inputs.count || 20 }}"
+          N="${{ inputs.count }}"; N=${N:-20}
           [ "$N" -gt 20 ] && N=20; [ "$N" -lt 1 ] && N=1
           echo "ids=$(seq 0 $((N-1)) | jq -cs .)" >> "$GITHUB_OUTPUT"
-          if grep -q "ten-mien-game-cua-ban" config.yaml && [ "${{ github.event.inputs.selftest }}" != "true" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Chưa điền URL game trong config.yaml – bỏ qua lượt chạy." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   run:
     needs: plan
-    if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -47,6 +37,9 @@ jobs:
       max-parallel: 5          # mỗi job là 1 máy ảo mới, IP mới
       matrix:
         id: ${{ fromJson(needs.plan.outputs.ids) }}
+    env:
+      API_URL: ${{ inputs.api }}
+      SELFTEST: ${{ inputs.selftest }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,52 +47,15 @@ jobs:
       - run: pip install -r runner/requirements.txt
       - name: Cài Chrome cho Playwright
         run: python -m playwright install --with-deps chrome || python -m playwright install --with-deps chromium
-      - name: Trang mẫu (chỉ khi selftest)
-        if: github.event.inputs.selftest == 'true'
+      - name: Trang mẫu (chỉ khi chạy thử)
+        if: inputs.selftest == 'true'
         run: |
           (cd test && python -m http.server 8765 >/dev/null 2>&1 &)
           sleep 1
           echo "SITE_URL=http://localhost:8765/page.html" >> "$GITHUB_ENV"
       - name: Chạy kiểm thử
-        run: python runner/run.py --config config.yaml --profile ${{ matrix.id }} --out result-${{ matrix.id }}.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: result-${{ matrix.id }}
-          path: result-${{ matrix.id }}.json
-          retention-days: 7
-          if-no-files-found: ignore
-
-  report:
-    needs: [plan, run]
-    if: always() && needs.plan.outputs.skip != 'true'
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { path: results-in, pattern: "result-*" }
-      - name: Tổng hợp
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          DAY=$(TZ=Asia/Ho_Chi_Minh date +%F)
-          TAG=$([ "${{ github.event.inputs.selftest }}" = "true" ] && echo "-selftest" || echo "")
-          echo "DAY=$DAY" >> "$GITHUB_ENV"; echo "TAG=$TAG" >> "$GITHUB_ENV"
-          python runner/report.py results-in report.md "summary.json"
-          cat report.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Lưu vào nhánh results
-        run: |
-          git config user.name "qa-bot"; git config user.email "qa-bot@users.noreply.github.com"
-          git fetch origin results || true
-          git worktree add -B results ../store origin/results 2>/dev/null || {
-            git worktree add --detach ../store; cd ../store; git checkout --orphan results; git rm -rfq .; cd -; }
-          F="${DAY}${TAG}-$(date +%H%M).json"
-          cp summary.json "../store/$F"; cp report.md "../store/${DAY}${TAG}-$(date +%H%M).md"
-          cd ../store && git add -A && git commit -qm "Kết quả $F" && git push -q origin results
-      - name: Cập nhật Issue vật phẩm lỗi trong ngày
-        run: |
-          TITLE="Vật phẩm lỗi ngày ${DAY}${TAG}"
-          N=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
-          { echo "Cập nhật lúc $(TZ=Asia/Ho_Chi_Minh date +%H:%M) · [chi tiết lượt chạy](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"; echo; cat report.md; } > body.md
-          if [ -n "$N" ]; then gh issue comment "$N" --body-file body.md
-          else gh issue create --title "$TITLE" --body-file body.md; fi
+          export RUNNER_TOKEN=$(printf '%s' "$CF_TOKEN:runner" | sha256sum | cut -c1-48)
+          python runner/run.py --config config.yaml --profile ${{ matrix.id }} --out result.json

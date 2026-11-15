@@ -1,0 +1,64 @@
+name: Triển khai website quản lý
+# Tự chạy khi code website thay đổi, hoặc bấm Run workflow sau khi thêm Secrets.
+
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+
+concurrency: deploy-website
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ADMIN_PASS: ${{ secrets.ADMIN_PASS }}
+      GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: Kiểm tra Secrets
+        id: check
+        run: |
+          miss=""
+          [ -z "$CLOUDFLARE_API_TOKEN" ] && miss="$miss CLOUDFLARE_API_TOKEN"
+          [ -z "$ADMIN_PASS" ] && miss="$miss ADMIN_PASS"
+          [ -z "$GH_DISPATCH_TOKEN" ] && miss="$miss GH_DISPATCH_TOKEN"
+          if [ -n "$miss" ]; then
+            echo "### Chưa triển khai: thiếu Secrets:$miss" >> "$GITHUB_STEP_SUMMARY"
+            echo "Xem hướng dẫn trong README.md, mục Cài đặt một lần." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tạo cơ sở dữ liệu D1 (nếu chưa có)
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          npm i -g wrangler@4 >/dev/null 2>&1
+          ID=$(wrangler d1 list --json | jq -r '.[] | select(.name=="game-maps-qa") | .uuid')
+          if [ -z "$ID" ]; then
+            wrangler d1 create game-maps-qa >/dev/null
+            ID=$(wrangler d1 list --json | jq -r '.[] | select(.name=="game-maps-qa") | .uuid')
+          fi
+          sed -i "s/__D1_ID__/$ID/" wrangler.toml
+          wrangler d1 execute game-maps-qa --remote --file schema.sql -y
+
+      - name: Đưa website lên Cloudflare
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          wrangler deploy --var GH_REPO:${{ github.repository }} | tee deploy.log
+          RUNNER_TOKEN=$(printf '%s' "$CLOUDFLARE_API_TOKEN:runner" | sha256sum | cut -c1-48)
+          jq -n --arg a "$ADMIN_PASS" --arg g "$GH_DISPATCH_TOKEN" --arg r "$RUNNER_TOKEN" \
+            '{ADMIN_PASS:$a, GH_TOKEN:$g, RUNNER_TOKEN:$r}' | wrangler secret bulk
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "### Website quản lý: $URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Đăng nhập bằng mật khẩu ADMIN_PASS." >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,14 @@
+name = "game-maps-qa"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Mỗi giờ phút 17 Worker tự kiểm tra lịch chạy trong trang Cài đặt
+[triggers]
+crons = ["17 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "game-maps-qa"
+database_id = "__D1_ID__"   # workflow deploy tự điền
+
+# GH_REPO, RUNNER_TOKEN, ADMIN_PASS, GH_TOKEN do workflow deploy đặt

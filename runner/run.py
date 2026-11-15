@@ -1,8 +1,9 @@
 """Bấm chuột giữa vào các ô màu quy định và ghi lại tab mới có mở thành công không.
 
 Chạy:  python runner/run.py --config config.yaml [--profile 3]
-Kết quả ghi ra file JSON (--out), job "report" của workflow gom lại.
-Biến môi trường SITE_URL (nếu có) thay cho url đầu tiên trong config.
+Có API_URL (website quản lý): đọc cấu hình từ website và gửi kết quả về đó.
+Không có API_URL: đọc config.yaml, chỉ in kết quả và ghi file --out.
+Biến môi trường: API_URL, RUNNER_TOKEN, SITE_URL (thay url game, dùng cho selftest), SELFTEST=true.
 """
 import argparse, asyncio, io, json, os, sys, time, urllib.request, uuid
 
@@ -79,6 +80,9 @@ async def run(cfg, profile):
                                     "ok": False, "reason": "khong_thay_mau"})
                 for x, y, _ in spots[: target.get("max", 50)]:
                     r = await click_and_check(context, page, x, y, cfg["timeout_ms"])
+                    if not r["ok"] and r["reason"] in ("khong_mo_tab", "tai_trang_qua_lau"):
+                        await page.wait_for_timeout(1500)  # bấm lại 1 lần để tránh báo lỗi nhầm
+                        r = await click_and_check(context, page, x, y, cfg["timeout_ms"])
                     results.append({"site": site["url"], "color": target["color"],
                                     "x": x, "y": y, **r})
                     await page.wait_for_timeout(cfg.get("pause_ms", 500))
@@ -97,6 +101,24 @@ def lookup_ip():
         return {"ip": None, "error": str(e)}
 
 
+def api_call(path, data=None):
+    req = urllib.request.Request(
+        os.environ["API_URL"].rstrip("/") + path,
+        data=json.dumps(data).encode() if data is not None else None,
+        method="POST" if data is not None else "GET",
+        headers={"Content-Type": "application/json",
+                 "Authorization": f"Bearer {os.environ.get('RUNNER_TOKEN', '')}"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def config_from_web(base):
+    w = api_call("/api/config")
+    base["sites"] = [{"url": w.get("url", ""), "wait_ms": int(w.get("wait_seconds", 4)) * 1000,
+                      "colors": w.get("colors", [])}]
+    return base
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
@@ -104,6 +126,8 @@ def main():
     ap.add_argument("--out", default="result.json")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))
+    if os.environ.get("API_URL") and os.environ.get("SELFTEST") != "true":
+        cfg = config_from_web(cfg)  # selftest dùng màu mẫu trong config.yaml
     if os.environ.get("SITE_URL"):
         cfg["sites"][0]["url"] = os.environ["SITE_URL"]
     profiles = cfg["profiles"]
@@ -113,6 +137,7 @@ def main():
     payload = {"run_id": str(uuid.uuid4()), "profile": profile.get("name", ""),
                "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                "where": lookup_ip(),
+               "selftest": os.environ.get("SELFTEST") == "true",
                "seconds": round(time.time() - started, 1), "clicks": results}
     ok = sum(r["ok"] for r in results)
     print(f"{ok}/{len(results)} điểm bấm thành công")
@@ -121,6 +146,8 @@ def main():
             print("  LỖI", r["color"], r.get("x"), r.get("y"), r["reason"])
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=1)
+    if os.environ.get("API_URL"):
+        print("Đã gửi về website:", api_call("/api/results", payload))
 
 
 if __name__ == "__main__":

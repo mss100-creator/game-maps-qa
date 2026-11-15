@@ -1,0 +1,244 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f3ef"><title>Kiểm thử game maps</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#f4f3ef;--card:#fff;--line:#e3e1d9;--text:#1f1e1c;--muted:#6b6a65;--ok:#067647;--okbg:#e7f6ec;--bad:#b42318;--badbg:#fdecea;--acc:#1f1e1c}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:16px;-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+header h1{font-size:18px;margin:0}header a{color:var(--muted);font-size:14px;text-decoration:none}
+main{max-width:720px;margin:0 auto;padding:14px 14px calc(96px + env(safe-area-inset-bottom))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted);font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+@media(min-width:620px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:26px;margin-top:2px}
+h2{font-size:16px;margin:18px 4px 8px}
+button,.btn{font:inherit;font-size:16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);padding:12px 14px;cursor:pointer}
+button.primary{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600}
+button:disabled{opacity:.5}
+input,select{font:inherit;font-size:16px;border:1px solid #d6d4cc;border-radius:10px;padding:11px 12px;background:#fff;color:var(--text);width:100%}
+label.f{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
+.item{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0;padding-top:0}
+.sw{width:28px;height:28px;border-radius:8px;flex:none;border:1px solid rgba(0,0,0,.1)}
+.tag{display:inline-block;font-size:13px;padding:3px 8px;border-radius:999px;margin-top:4px}
+.tag.bad{background:var(--badbg);color:var(--bad)}.tag.ok{background:var(--okbg);color:var(--ok)}.tag.n{background:#efeee9;color:var(--muted)}
+.datebar{display:flex;gap:8px;margin-bottom:12px}.datebar input{text-align:center}
+.datebar button{padding:10px 14px}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;border-radius:0;background:none;padding:14px 0 12px;font-size:15px;color:var(--muted)}
+nav button.on{color:var(--text);font-weight:600;box-shadow:inset 0 3px 0 var(--acc)}
+.switch{position:relative;width:52px;height:30px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;background:#d6d4cc;border-radius:999px;transition:.2s}
+.switch span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+span{background:var(--ok)}.switch input:checked+span:before{transform:translateX(22px)}
+.hours{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.hours button{padding:10px 0;font-size:15px}.hours button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.color-row{display:grid;grid-template-columns:48px 1fr 44px;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.color-row:first-child{border-top:0}
+.color-row input[type=color]{padding:2px;height:44px}
+.color-row .tol{grid-column:1/-1;display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.color-row .tol input{padding:0;border:0}
+.stepper{display:flex;align-items:center;gap:8px}.stepper button{width:48px}.stepper input{text-align:center;width:72px}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1f1e1c;color:#fff;padding:12px 16px;border-radius:10px;font-size:15px;max-width:90vw;display:none;z-index:9}
+.empty{text-align:center;color:var(--muted);padding:18px 6px}
+a{color:#175cd3}
+</style></head><body>
+<header><h1>Kiểm thử game maps</h1><a href="/logout">Đăng xuất</a></header>
+<main>
+<section id="v-results">
+  <div class="card">
+    <div class="row"><div class="grow"><b>Chạy ngay</b><div class="muted" id="run-hint">Mỗi lượt là một máy ở Mỹ với IP mới</div></div></div>
+    <div class="row" style="margin-top:12px">
+      <select id="run-count" style="width:auto"></select>
+      <button class="primary grow" id="run-btn">Chạy ngay</button>
+    </div>
+  </div>
+  <div class="datebar"><button id="prev" aria-label="Ngày trước">‹</button><input type="date" id="day"><button id="next" aria-label="Ngày sau">›</button></div>
+  <div class="stats">
+    <div class="stat"><span class="muted">Lượt chạy</span><b id="s-runs">–</b></div>
+    <div class="stat"><span class="muted">IP khác nhau</span><b id="s-ips">–</b></div>
+    <div class="stat"><span class="muted">Bấm thành công</span><b id="s-ok" style="color:var(--ok)">–</b></div>
+    <div class="stat"><span class="muted">Vật phẩm lỗi</span><b id="s-bad" style="color:var(--bad)">–</b></div>
+  </div>
+  <h2>Vật phẩm lỗi cần khóa</h2>
+  <div class="card" id="fails"><div class="empty">Đang tải…</div></div>
+  <h2>Các lượt chạy</h2>
+  <div class="card" id="runs"><div class="empty">Đang tải…</div></div>
+</section>
+
+<section id="v-settings" hidden>
+  <div class="card row">
+    <div class="grow"><b>Tự động chạy hằng ngày</b><div class="muted">Theo các giờ chọn bên dưới (giờ Việt Nam)</div></div>
+    <label class="switch"><input type="checkbox" id="c-enabled"><span></span></label>
+  </div>
+  <div class="card">
+    <b>Trang game</b>
+    <label class="f" for="c-url">Địa chỉ trang bản đồ</label>
+    <input id="c-url" type="url" inputmode="url" placeholder="https://game-cua-ban.com/map">
+    <label class="f" for="c-wait">Chờ bản đồ hiện xong (giây)</label>
+    <input id="c-wait" type="number" min="1" max="60" inputmode="numeric">
+  </div>
+  <div class="card">
+    <div class="row"><b class="grow">Màu ô vật phẩm</b><button id="add-color">+ Thêm màu</button></div>
+    <div id="colors" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <b>Số lượt mỗi đợt</b><div class="muted">Mỗi lượt khoảng 2 phút chạy GitHub</div>
+    <div class="stepper" style="margin-top:10px"><button id="dec">−</button><input id="c-runs" type="number" min="1" max="20" inputmode="numeric"><button id="inc">+</button></div>
+    <label class="f">Giờ chạy (giờ Việt Nam)</label>
+    <div class="hours" id="hours"></div>
+    <p class="muted" id="estimate" style="margin:12px 0 0"></p>
+  </div>
+  <button class="primary" id="save" style="width:100%;padding:15px">Lưu cài đặt</button>
+  <div class="card" style="margin-top:16px">
+    <b>Kiểm tra công cụ</b>
+    <div class="muted" style="margin:4px 0 10px">Chạy 2 lượt với trang mẫu (không đụng game thật) để xem hệ thống còn hoạt động.</div>
+    <button id="selftest" style="width:100%">Chạy thử với trang mẫu</button>
+  </div>
+</section>
+</main>
+<nav><button id="t-results" class="on">Kết quả</button><button id="t-settings">Cài đặt</button></nav>
+<div id="toast" role="status"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const REASONS = { khong_mo_tab: "Bấm không mở tab", khong_thay_mau: "Không thấy màu trên bản đồ", tai_trang_qua_lau: "Tải trang quá lâu" };
+const reasonText = (r) => REASONS[r] || (r && r.startsWith("http_") ? "Trang đích lỗi " + r.slice(5) : r || "Lỗi");
+let cfg = null;
+
+function toast(msg, ms = 3500) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), ms); }
+async function api(path, opt = {}) {
+  const r = await fetch(path, { ...opt, headers: { "content-type": "application/json" } });
+  if (r.status === 401) { location.reload(); throw new Error("Hết phiên"); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Lỗi " + r.status);
+  return d;
+}
+
+/* --- Tabs --- */
+function show(tab) {
+  $("v-results").hidden = tab !== "results"; $("v-settings").hidden = tab !== "settings";
+  $("t-results").classList.toggle("on", tab === "results"); $("t-settings").classList.toggle("on", tab === "settings");
+  if (location.hash !== "#" + tab) history.replaceState(null, "", "#" + tab);
+  window.scrollTo(0, 0);
+}
+$("t-results").onclick = () => show("results"); $("t-settings").onclick = () => show("settings");
+
+/* --- Kết quả --- */
+const today = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+$("day").value = today();
+const shift = (n) => { const d = new Date($("day").value + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); $("day").value = d.toISOString().slice(0, 10); loadData(); };
+$("prev").onclick = () => shift(-1); $("next").onclick = () => shift(1); $("day").onchange = () => loadData();
+const vnTime = (t) => new Date(t.replace(" ", "T") + "Z").toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" });
+
+async function loadData() {
+  try {
+    const d = await api("/api/data?day=" + $("day").value);
+    const total = d.runs.reduce((a, r) => a + r.total, 0), ok = d.runs.reduce((a, r) => a + r.ok, 0);
+    $("s-runs").textContent = d.runs.length;
+    $("s-ips").textContent = new Set(d.runs.map((r) => r.ip).filter(Boolean)).size;
+    $("s-ok").textContent = total ? ok + "/" + total : "–";
+    $("s-bad").textContent = d.fails.length;
+    $("fails").innerHTML = d.fails.length ? d.fails.map((f) => `
+      <div class="item"><div class="sw" style="background:${esc(f.color)}"></div><div class="grow">
+        <b>${esc(f.color)}</b> <span class="muted">· vị trí ${f.x ?? "–"}, ${f.y ?? "–"}</span>
+        ${f.kind === "selftest" ? '<span class="tag n">trang mẫu</span>' : ""}<br>
+        <span class="tag bad">${esc(reasonText(f.reason))}</span> <span class="muted">gặp ${f.times} lần</span>
+        <div class="muted" style="margin-top:4px">${esc((f.places || "").split(",").map((s) => s.trim()).filter(Boolean).join(", "))}</div>
+        ${f.url ? `<a href="${esc(f.url)}" target="_blank" rel="noopener">Mở trang đích</a>` : ""}
+      </div></div>`).join("") : '<div class="empty">Không có vật phẩm lỗi trong ngày này</div>';
+    $("runs").innerHTML = d.runs.length ? d.runs.map((r) => `
+      <div class="item"><div class="grow"><b>${vnTime(r.created_at)}</b> · ${esc([r.city, r.region].filter(Boolean).join(", ") || "Không rõ nơi")}
+        ${r.kind === "selftest" ? '<span class="tag n">trang mẫu</span>' : ""}
+        <div class="muted">${esc(r.ip || "")} ${r.asn ? "· " + esc(r.asn.replace(/^AS\d+\s*/, "")) : ""}</div></div>
+        <div><span class="tag ${r.ok === r.total ? "ok" : "bad"}">${r.ok}/${r.total}</span></div></div>`).join("")
+      : '<div class="empty">Chưa có lượt chạy nào trong ngày này</div>';
+  } catch (e) { toast(e.message); }
+}
+
+for (let i = 1; i <= 20; i++) $("run-count").insertAdjacentHTML("beforeend", `<option value="${i}">${i} lượt</option>`);
+async function startRun(selftest, btn) {
+  btn.disabled = true;
+  try {
+    await api("/api/run", { method: "POST", body: JSON.stringify(selftest ? { count: 2, selftest: true } : { count: +$("run-count").value }) });
+    toast("Đã bắt đầu. Kết quả hiện ở tab Kết quả sau khoảng 3–5 phút.", 6000);
+    if (selftest) show("results");
+  } catch (e) { toast(e.message, 6000); }
+  setTimeout(() => (btn.disabled = false), 15000);
+}
+$("run-btn").onclick = () => startRun(false, $("run-btn"));
+$("selftest").onclick = () => startRun(true, $("selftest"));
+
+/* --- Cài đặt --- */
+for (let h = 0; h < 24; h++) $("hours").insertAdjacentHTML("beforeend", `<button type="button" data-h="${h}">${h}h</button>`);
+$("hours").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; b.classList.toggle("on"); estimate(); };
+$("dec").onclick = () => { $("c-runs").value = Math.max(1, +$("c-runs").value - 1); estimate(); };
+$("inc").onclick = () => { $("c-runs").value = Math.min(20, +$("c-runs").value + 1); estimate(); };
+$("c-runs").oninput = estimate;
+
+function estimate() {
+  const n = Math.min(20, Math.max(1, +$("c-runs").value || 1));
+  const hours = [...$("hours").querySelectorAll(".on")].length;
+  const perMonth = n * hours * 2 * 30;
+  $("estimate").innerHTML = hours
+    ? `${n * hours} lượt mỗi ngày · khoảng ${perMonth.toLocaleString("vi-VN")} phút GitHub mỗi tháng` +
+      (perMonth > 2000 ? ' · <span style="color:var(--bad)">vượt 2.000 phút miễn phí của repo private</span>' : "")
+    : "Chưa chọn giờ chạy nào";
+}
+
+function colorRow(c) {
+  const row = document.createElement("div"); row.className = "color-row";
+  row.innerHTML = `<input type="color" value="${esc(c.color)}" aria-label="Chọn màu">
+    <input type="text" value="${esc(c.color)}" maxlength="7" aria-label="Mã màu" autocapitalize="characters">
+    <button type="button" aria-label="Xoá màu">✕</button>
+    <div class="tol">Độ lệch màu cho phép <input type="range" min="0" max="60" value="${c.tolerance}" class="grow"> <span>${c.tolerance}</span></div>`;
+  const [pick, hex, del] = row.querySelectorAll("input[type=color], input[type=text], button");
+  const range = row.querySelector("input[type=range]");
+  pick.oninput = () => (hex.value = pick.value.toUpperCase());
+  hex.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(hex.value)) pick.value = hex.value; };
+  range.oninput = () => (row.querySelector(".tol span").textContent = range.value);
+  del.onclick = () => row.remove();
+  row._c = c; return row;
+}
+$("add-color").onclick = () => $("colors").append(colorRow({ color: "#FF3B30", tolerance: 12, min_area: 30, max: 50 }));
+
+function fillSettings(c) {
+  $("c-enabled").checked = c.enabled; $("c-url").value = c.url; $("c-wait").value = c.wait_seconds;
+  $("c-runs").value = c.runs_per_batch; $("run-count").value = c.runs_per_batch;
+  $("colors").innerHTML = ""; c.colors.forEach((x) => $("colors").append(colorRow(x)));
+  $("hours").querySelectorAll("button").forEach((b) => b.classList.toggle("on", c.run_hours.includes(+b.dataset.h)));
+  estimate();
+}
+function readSettings() {
+  return {
+    enabled: $("c-enabled").checked, url: $("c-url").value.trim(), wait_seconds: +$("c-wait").value,
+    runs_per_batch: +$("c-runs").value,
+    run_hours: [...$("hours").querySelectorAll(".on")].map((b) => +b.dataset.h),
+    colors: [...$("colors").children].map((r) => ({ ...r._c,
+      color: r.querySelector("input[type=text]").value.trim(),
+      tolerance: +r.querySelector("input[type=range]").value })),
+  };
+}
+$("save").onclick = async () => {
+  const c = readSettings();
+  if (c.url && !/^https?:\/\//.test(c.url)) return toast("Địa chỉ trang game phải bắt đầu bằng https://");
+  if (c.colors.some((x) => !/^#[0-9a-f]{6}$/i.test(x.color))) return toast("Mã màu phải có dạng #RRGGBB, ví dụ #2E86DE");
+  if (c.enabled && !c.url) return toast("Nhập địa chỉ trang game trước khi bật tự động");
+  $("save").disabled = true;
+  try { cfg = await api("/api/config", { method: "PUT", body: JSON.stringify(c) }); fillSettings(cfg); toast("Đã lưu cài đặt"); }
+  catch (e) { toast(e.message); }
+  $("save").disabled = false;
+};
+
+(async () => {
+  show(location.hash === "#settings" ? "settings" : "results");
+  loadData(); setInterval(() => { if (!$("v-results").hidden && !document.hidden) loadData(); }, 30000);
+  try { cfg = await api("/api/config"); fillSettings(cfg); } catch (e) { toast(e.message); }
+})();
+</script></body></html>

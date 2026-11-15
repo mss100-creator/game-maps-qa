@@ -1,0 +1,5 @@
+worker/.dev.vars
+worker/.wrangler/
+worker/node_modules/
+result*.json
+__pycache__/
