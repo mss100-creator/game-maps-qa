@@ -1,0 +1,191 @@
+[
+ {
+  "run_id": "65c1714c-c309-402e-a0d8-d74d4bfe4500",
+  "profile": "Eastern",
+  "time": "2026-11-15T03:03:27Z",
+  "where": {
+   "ip": "9.234.23.163",
+   "city": "Des Moines",
+   "region": "Iowa",
+   "country": "US",
+   "org": "AS8075 Microsoft Corporation"
+  },
+  "seconds": 23.3,
+  "clicks": [
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 120,
+    "y": 120,
+    "ok": true,
+    "url": "http://localhost:8765/ok1.html",
+    "status": 200,
+    "reason": null
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 720,
+    "y": 220,
+    "ok": false,
+    "url": "http://localhost:8765/khong-ton-tai.html",
+    "status": 404,
+    "reason": "http_404"
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 420,
+    "y": 320,
+    "ok": true,
+    "url": "http://localhost:8765/ok2.html",
+    "status": 200,
+    "reason": null
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 920,
+    "y": 520,
+    "ok": false,
+    "reason": "khong_mo_tab"
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#FF3B30",
+    "x": 220,
+    "y": 520,
+    "ok": true,
+    "url": "http://localhost:8765/ok1.html",
+    "status": 200,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "run_id": "77b98cf3-7282-44b0-96fa-b9c0380326de",
+  "profile": "Central",
+  "time": "2026-11-15T03:03:27Z",
+  "where": {
+   "ip": "20.169.69.242",
+   "city": "Phoenix",
+   "region": "Arizona",
+   "country": "US",
+   "org": "AS8075 Microsoft Corporation"
+  },
+  "seconds": 25.0,
+  "clicks": [
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 120,
+    "y": 120,
+    "ok": true,
+    "url": "http://localhost:8765/ok1.html",
+    "status": 200,
+    "reason": null
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 720,
+    "y": 220,
+    "ok": false,
+    "url": "http://localhost:8765/khong-ton-tai.html",
+    "status": 404,
+    "reason": "http_404"
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 420,
+    "y": 320,
+    "ok": true,
+    "url": "http://localhost:8765/ok2.html",
+    "status": 200,
+    "reason": null
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 920,
+    "y": 520,
+    "ok": false,
+    "reason": "khong_mo_tab"
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#FF3B30",
+    "x": 220,
+    "y": 520,
+    "ok": true,
+    "url": "http://localhost:8765/ok1.html",
+    "status": 200,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "run_id": "136a77e9-9de7-44f1-b028-7ad0a2505937",
+  "profile": "Mountain",
+  "time": "2026-11-15T03:03:31Z",
+  "where": {
+   "ip": "20.29.52.242",
+   "city": "Des Moines",
+   "region": "Iowa",
+   "country": "US",
+   "org": "AS8075 Microsoft Corporation"
+  },
+  "seconds": 23.6,
+  "clicks": [
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 120,
+    "y": 120,
+    "ok": true,
+    "url": "http://localhost:8765/ok1.html",
+    "status": 200,
+    "reason": null
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 720,
+    "y": 220,
+    "ok": false,
+    "url": "http://localhost:8765/khong-ton-tai.html",
+    "status": 404,
+    "reason": "http_404"
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 420,
+    "y": 320,
+    "ok": true,
+    "url": "http://localhost:8765/ok2.html",
+    "status": 200,
+    "reason": null
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#2E86DE",
+    "x": 920,
+    "y": 520,
+    "ok": false,
+    "reason": "khong_mo_tab"
+   },
+   {
+    "site": "http://localhost:8765/page.html",
+    "color": "#FF3B30",
+    "x": 220,
+    "y": 520,
+    "ok": true,
+    "url": "http://localhost:8765/ok1.html",
+    "status": 200,
+    "reason": null
+   }
+  ]
+ }
+]
