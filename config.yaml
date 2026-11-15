@@ -1,0 +1,26 @@
+# Cấu hình kiểm thử – sửa phần sites cho đúng game của bạn
+headless: true
+browser_channel: chrome      # Chrome thật cài sẵn trên runner GitHub; bỏ trống = Chromium
+viewport: { width: 1366, height: 768 }
+timeout_ms: 15000
+pause_ms: 500                # nghỉ giữa 2 lần bấm
+
+sites:
+  - url: https://ten-mien-game-cua-ban.com/map
+    wait_ms: 4000            # chờ bản đồ vẽ xong
+    colors:
+      - color: "#2E86DE"     # màu ô vật phẩm VIP
+        tolerance: 12        # sai lệch cho phép mỗi kênh RGB (0-255)
+        min_area: 30         # bỏ qua vùng nhỏ hơn 30 pixel
+        max: 50              # tối đa số ô bấm cho màu này
+      - color: "#FF3B30"
+        tolerance: 12
+        min_area: 30
+
+# Mỗi job GitHub dùng 1 hồ sơ (theo số thứ tự, quay vòng)
+profiles:
+  - { name: Eastern,  timezone: America/New_York,    locale: en-US }
+  - { name: Central,  timezone: America/Chicago,     locale: en-US }
+  - { name: Mountain, timezone: America/Denver,      locale: en-US }
+  - { name: Pacific,  timezone: America/Los_Angeles, locale: en-US }
+  - { name: Toronto,  timezone: America/Toronto,     locale: en-CA }
