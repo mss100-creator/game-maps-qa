@@ -4,7 +4,7 @@ import LOGIN_HTML from "./login.html";
 
 const DEFAULT_CONFIG = {
   enabled: false,
-  url: "",
+  urls: [],
   wait_seconds: 4,
   colors: [{ color: "#2E86DE", tolerance: 12, min_area: 30, max: 50 }],
   runs_per_batch: 20,
@@ -32,7 +32,9 @@ const isRunner = (req, env) => (req.headers.get("authorization") || "") === `Bea
 
 async function getSetting(env, key, fallback) {
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(key).first();
-  return row ? JSON.parse(row.value) : fallback;
+  const v = row ? JSON.parse(row.value) : fallback;
+  if (key === "config" && v && !Array.isArray(v.urls)) v.urls = v.url ? [v.url] : [];  // cấu hình cũ 1 link
+  return v;
 }
 const putSetting = (env, key, value) =>
   env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
@@ -42,7 +44,8 @@ function cleanConfig(c) {
   const n = (v, lo, hi, d) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d);
   return {
     enabled: !!c.enabled,
-    url: String(c.url || "").trim().slice(0, 500),
+    urls: [...new Set((Array.isArray(c.urls) ? c.urls : String(c.url || "").split(/\s+/))
+      .map((u) => String(u).trim()).filter((u) => /^https?:\/\/\S+$/.test(u)).map((u) => u.slice(0, 500)))].slice(0, 20),
     wait_seconds: n(c.wait_seconds, 1, 60, 4),
     colors: (Array.isArray(c.colors) ? c.colors : []).slice(0, 12)
       .filter((x) => /^#[0-9a-fA-F]{6}$/.test(x.color || ""))
@@ -91,12 +94,12 @@ async function listData(env, day) {
     `SELECT * FROM runs WHERE date(created_at, '+7 hours') = ? ORDER BY created_at DESC LIMIT 500`
   ).bind(day).all()).results;
   const fails = (await env.DB.prepare(
-    `SELECT c.color, c.x, c.y, c.reason, MAX(c.url) AS url, COUNT(*) AS times,
+    `SELECT c.site, c.color, c.x, c.y, c.reason, MAX(c.url) AS url, COUNT(*) AS times,
             GROUP_CONCAT(DISTINCT COALESCE(r.city, '') || ', ' || COALESCE(r.region, '')) AS places,
             MAX(r.kind) AS kind
      FROM clicks c JOIN runs r ON r.id = c.run_id
      WHERE c.ok = 0 AND date(r.created_at, '+7 hours') = ?
-     GROUP BY c.color, c.x, c.y, c.reason ORDER BY times DESC LIMIT 300`
+     GROUP BY c.site, c.color, c.x, c.y, c.reason ORDER BY times DESC LIMIT 300`
   ).bind(day).all()).results;
   return { day, runs, fails };
 }
@@ -138,7 +141,7 @@ export default {
     if (p === "/api/run" && req.method === "POST") {
       const b = await req.json().catch(() => ({}));
       const cfg = await getSetting(env, "config", DEFAULT_CONFIG);
-      if (!b.selftest && !cfg.url) return json({ error: "Chưa nhập địa chỉ trang game trong Cài đặt" }, 400);
+      if (!b.selftest && !cfg.urls.length) return json({ error: "Chưa nhập địa chỉ trang game trong Cài đặt" }, 400);
       try {
         await dispatch(env, url.origin, Math.min(20, Math.max(1, +b.count || cfg.runs_per_batch)), !!b.selftest);
         return json({ ok: true });
@@ -155,7 +158,7 @@ export default {
     const cfg = await getSetting(env, "config", DEFAULT_CONFIG);
     const origin = await getSetting(env, "origin", null);
     const vnHour = (new Date(event.scheduledTime).getUTCHours() + 7) % 24;
-    if (!cfg.enabled || !cfg.url || !origin || !cfg.run_hours.includes(vnHour)) return;
+    if (!cfg.enabled || !cfg.urls.length || !origin || !cfg.run_hours.includes(vnHour)) return;
     ctx.waitUntil(dispatch(env, origin, cfg.runs_per_batch));
   },
 };

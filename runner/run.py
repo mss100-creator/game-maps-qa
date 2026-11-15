@@ -112,9 +112,15 @@ def api_call(path, data=None):
         return json.load(r)
 
 
-def config_from_web(base):
+def config_from_web(base, index):
+    """Lượt thứ index (0, 1, 2…) chạy link thứ index % số link: xoay vòng."""
     w = api_call("/api/config")
-    base["sites"] = [{"url": w.get("url", ""), "wait_ms": int(w.get("wait_seconds", 4)) * 1000,
+    urls = w.get("urls") or ([w["url"]] if w.get("url") else [])
+    if not urls:
+        raise SystemExit("Chưa có link trang bản đồ trong Cài đặt")
+    url = urls[index % len(urls)]
+    print(f"Lượt {index + 1}: link {index % len(urls) + 1}/{len(urls)} – {url}")
+    base["sites"] = [{"url": url, "wait_ms": int(w.get("wait_seconds", 4)) * 1000,
                       "colors": w.get("colors", [])}]
     return base
 
@@ -127,7 +133,7 @@ def main():
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))
     if os.environ.get("API_URL") and os.environ.get("SELFTEST") != "true":
-        cfg = config_from_web(cfg)  # selftest dùng màu mẫu trong config.yaml
+        cfg = config_from_web(cfg, a.profile)  # selftest dùng màu mẫu trong config.yaml
     if os.environ.get("SITE_URL"):
         cfg["sites"][0]["url"] = os.environ["SITE_URL"]
     profiles = cfg["profiles"]
