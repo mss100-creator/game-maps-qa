@@ -5,7 +5,7 @@ Có API_URL (website quản lý): đọc cấu hình từ website và gửi kế
 Không có API_URL: đọc config.yaml, chỉ in kết quả và ghi file --out.
 Biến môi trường: API_URL, RUNNER_TOKEN, SITE_URL (thay url game, dùng cho selftest), SELFTEST=true.
 """
-import argparse, asyncio, io, json, os, sys, time, urllib.request, uuid
+import argparse, asyncio, io, json, os, sys, time, urllib.error, urllib.request, uuid
 
 import numpy as np
 import yaml
@@ -107,6 +107,8 @@ def api_call(path, data=None):
         data=json.dumps(data).encode() if data is not None else None,
         method="POST" if data is not None else "GET",
         headers={"Content-Type": "application/json",
+                 # Cloudflare chặn chữ ký mặc định "Python-urllib" (403), nên tự đặt tên riêng
+                 "User-Agent": "game-maps-qa-runner/1.0 (+github-actions)",
                  "Authorization": f"Bearer {os.environ.get('RUNNER_TOKEN', '')}"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
@@ -153,7 +155,10 @@ def main():
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=1)
     if os.environ.get("API_URL"):
-        print("Đã gửi về website:", api_call("/api/results", payload))
+        try:
+            print("Đã gửi về website:", api_call("/api/results", payload))
+        except urllib.error.HTTPError as e:
+            raise SystemExit(f"Website từ chối nhận kết quả: HTTP {e.code} {e.read()[:200]!r}")
 
 
 if __name__ == "__main__":
