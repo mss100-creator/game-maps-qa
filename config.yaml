@@ -8,7 +8,7 @@ pause_ms: 500                # nghỉ giữa 2 lần bấm
 
 sites:
   - url: https://ten-mien-game-cua-ban.com/map
-    wait_ms: 4000            # chờ bản đồ vẽ xong
+    wait_ms: 5000            # chờ bản đồ vẽ xong
     colors:
       - color: "#2E86DE"     # màu ô vật phẩm VIP
         tolerance: 12        # sai lệch cho phép mỗi kênh RGB (0-255)
