@@ -49,6 +49,26 @@ nav button.on{color:var(--text);font-weight:600;box-shadow:inset 0 3px 0 var(--a
 #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1f1e1c;color:#fff;padding:12px 16px;border-radius:10px;font-size:15px;max-width:90vw;display:none;z-index:9}
 .empty{text-align:center;color:var(--muted);padding:18px 6px}
 a{color:#175cd3}
+.chips{display:flex;gap:8px;overflow-x:auto;margin:0 -14px 12px;padding:0 14px;scrollbar-width:none}
+.chips button{flex:none;padding:8px 14px;border-radius:999px;font-size:15px}
+.chips button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.bar{height:8px;background:#efeee9;border-radius:99px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:99px}
+.trend{display:flex;align-items:flex-end;gap:4px;height:110px;margin-top:10px}
+.trend div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.trend span{display:block;width:100%;border-radius:4px 4px 0 0;min-height:2px}
+.trend small{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap}
+.trend.labels{height:auto;margin-top:0}
+.run{border-top:1px solid var(--line);padding:12px 0}.run:first-child{border-top:0;padding-top:0}
+.run summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:center}
+.run summary::-webkit-details-marker{display:none}
+.run summary:after{content:"›";color:var(--muted);font-size:20px;transition:transform .2s}
+.run[open] summary:after{transform:rotate(90deg)}
+.pt{display:flex;gap:10px;align-items:center;font-size:14px;padding:7px 0 7px 4px;border-top:1px dashed var(--line)}
+.pt .sw{width:16px;height:16px;border-radius:4px}
+.ok-t{color:var(--ok)}.bad-t{color:var(--bad)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:14px;margin-top:6px}
+.kv span:nth-child(odd){color:var(--muted)}
 </style></head><body>
 <header><h1>Kiểm thử game maps</h1><a href="/logout">Đăng xuất</a></header>
 <main>
@@ -61,15 +81,22 @@ a{color:#175cd3}
     </div>
   </div>
   <div class="datebar"><button id="prev" aria-label="Ngày trước">‹</button><input type="date" id="day"><button id="next" aria-label="Ngày sau">›</button></div>
+  <div class="chips" id="chips"></div>
   <div class="stats">
     <div class="stat"><span class="muted">Lượt chạy</span><b id="s-runs">–</b></div>
     <div class="stat"><span class="muted">IP khác nhau</span><b id="s-ips">–</b></div>
-    <div class="stat"><span class="muted">Bấm thành công</span><b id="s-ok" style="color:var(--ok)">–</b></div>
+    <div class="stat"><span class="muted">Tỉ lệ bấm được</span><b id="s-ok" style="color:var(--ok)">–</b><span class="muted" id="s-ok2"></span></div>
     <div class="stat"><span class="muted">Vật phẩm lỗi</span><b id="s-bad" style="color:var(--bad)">–</b></div>
   </div>
-  <h2>Vật phẩm lỗi cần khóa</h2>
+  <h2>So sánh các link</h2>
+  <div class="card" id="links"><div class="empty">Đang tải…</div></div>
+  <h2>Tỉ lệ bấm được 14 ngày gần nhất</h2>
+  <div class="card"><div class="trend" id="trend"></div><div class="trend labels" id="trend-l"></div>
+    <div class="muted" id="trend-note" style="margin-top:8px"></div></div>
+  <div class="row" style="margin:18px 4px 8px"><h2 class="grow" style="margin:0">Vật phẩm lỗi cần khóa</h2>
+    <a class="btn" id="csv" href="#" style="font-size:14px;padding:8px 12px;text-decoration:none">Tải CSV</a></div>
   <div class="card" id="fails"><div class="empty">Đang tải…</div></div>
-  <h2>Các lượt chạy</h2>
+  <h2>Các lượt chạy <span class="muted" style="font-weight:400">· chạm để xem từng điểm bấm</span></h2>
   <div class="card" id="runs"><div class="empty">Đang tải…</div></div>
 </section>
 
@@ -80,9 +107,9 @@ a{color:#175cd3}
   </div>
   <div class="card">
     <b>Trang game</b>
-    <label class="f" for="c-url">Địa chỉ trang bản đồ (mỗi link một dòng)</label>
+    <label class="f" for="c-url">Link trang bản đồ – mỗi dòng một link, có thể ghi tên phía trước</label>
     <textarea id="c-url" rows="4" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"
-      placeholder="https://game-cua-ban.com/map-1&#10;https://game-cua-ban.com/map-2"></textarea>
+      placeholder="Chính https://game-cua-ban.com/map&#10;Beta https://beta.game-cua-ban.com/map"></textarea>
     <p class="muted" id="rotate" style="margin:8px 0 0"></p>
     <label class="f" for="c-wait">Chờ bản đồ hiện xong (giây)</label>
     <input id="c-wait" type="number" min="1" max="60" inputmode="numeric">
@@ -124,24 +151,33 @@ async function api(path, opt = {}) {
   return d;
 }
 
-const linesOf = (t) => t.split(/\s+/).map((u) => u.trim()).filter(Boolean);
-function rotation(n, links) {
+/* Mỗi dòng: [tên] link  → { name, url } */
+function parseLinks(text) {
+  return text.split(/\n+/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const m = line.match(/(https?:\/\/\S+)/);
+    if (!m) return { name: "", url: line };
+    return { name: line.replace(m[1], "").replace(/[|:–-]\s*$/, "").trim(), url: m[1] };
+  });
+}
+const linkCount = () => parseLinks($("c-url").value).length;
+function names() { return (cfg && cfg.names) || []; }
+function rotation(n, links, nm = []) {
   if (!links) return "";
   const per = Array.from({ length: links }, (_, i) => Math.floor(n / links) + (i < n % links ? 1 : 0));
-  return per.map((c, i) => `link ${i + 1}: ${c} lượt`).join(" · ");
+  return per.map((c, i) => `${nm[i] || "link " + (i + 1)}: ${c} lượt`).join(" · ");
 }
-function linkLabel(site) {
+function linkName(site) {
   const i = cfg && cfg.urls ? cfg.urls.indexOf(site) : -1;
-  return i >= 0 ? "Link " + (i + 1) : (site ? "Trang mẫu" : "");
+  return i >= 0 ? names()[i] || "Link " + (i + 1) : site ? "Trang mẫu / link cũ" : "Không rõ";
 }
 function updateRotate() {
-  const links = linesOf($("c-url").value).length, n = +$("c-runs").value || 1;
-  $("rotate").textContent = links ? `${links} link, xoay vòng theo lượt · mỗi đợt ${n} lượt → ${rotation(n, links)}` : "";
+  const L = parseLinks($("c-url").value), n = +$("c-runs").value || 1;
+  $("rotate").textContent = L.length ? `${L.length} link, xoay vòng theo lượt · mỗi đợt ${n} lượt → ${rotation(n, L.length, L.map((l) => l.name))}` : "";
 }
 function updateRunHint() {
   const links = cfg && cfg.urls ? cfg.urls.length : 0;
   $("run-hint").textContent = links > 1
-    ? `${links} link xoay vòng · ${rotation(+$("run-count").value, links)}`
+    ? `${links} link xoay vòng · ${rotation(+$("run-count").value, links, names())}`
     : "Mỗi lượt là một máy ở Mỹ với IP mới";
 }
 
@@ -160,30 +196,123 @@ $("day").value = today();
 const shift = (n) => { const d = new Date($("day").value + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); $("day").value = d.toISOString().slice(0, 10); loadData(); };
 $("prev").onclick = () => shift(-1); $("next").onclick = () => shift(1); $("day").onchange = () => loadData();
 const vnTime = (t) => new Date(t.replace(" ", "T") + "Z").toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" });
+const pct = (ok, n) => (n ? Math.round((ok / n) * 100) : 0);
+const place = (r) => [r.city, r.region].filter(Boolean).join(", ") || "Không rõ nơi";
+const statusText = (c) => c.ok ? "Mở được" + (c.status ? " · HTTP " + c.status : "") : reasonText(c.reason) + (c.status ? " · HTTP " + c.status : "");
+
+let DATA = null, TREND = [], FILTER = "all";
+
+function siteOfRun(clicks) { return clicks.length ? clicks[0].site : null; }
+
+function render() {
+  if (!DATA) return;
+  // Gắn điểm bấm vào từng lượt
+  const byRun = {};
+  DATA.clicks.forEach((c) => (byRun[c.run_id] = byRun[c.run_id] || []).push(c));
+  const runs = DATA.runs.map((r) => ({ ...r, clicks: byRun[r.id] || [], site: siteOfRun(byRun[r.id] || []) }));
+
+  // Nút lọc theo link
+  const sites = [...new Set(runs.map((r) => r.site).filter(Boolean))];
+  const order = (s) => { const i = cfg && cfg.urls ? cfg.urls.indexOf(s) : -1; return i < 0 ? 99 : i; };
+  sites.sort((a, b) => order(a) - order(b));
+  if (FILTER !== "all" && !sites.includes(FILTER)) FILTER = "all";
+  $("chips").innerHTML = [`<button data-s="all" class="${FILTER === "all" ? "on" : ""}">Tất cả</button>`,
+    ...sites.map((s) => `<button data-s="${esc(s)}" class="${FILTER === s ? "on" : ""}">${esc(linkName(s))}</button>`)].join("");
+  $("chips").hidden = sites.length < 2;
+
+  const shown = FILTER === "all" ? runs : runs.filter((r) => r.site === FILTER);
+  const clicks = shown.flatMap((r) => r.clicks.map((c) => ({ ...c, run: r })));
+  const okN = clicks.filter((c) => c.ok).length;
+
+  // Gộp lỗi theo vật phẩm
+  const runsPerSite = {}; runs.forEach((r) => (runsPerSite[r.site] = (runsPerSite[r.site] || 0) + 1));
+  const F = {};
+  clicks.filter((c) => !c.ok).forEach((c) => {
+    const k = [c.site, c.color, c.x, c.y, c.reason].join("|");
+    const f = (F[k] = F[k] || { ...c, times: 0, places: new Set(), first: c.run.created_at, last: c.run.created_at, statuses: new Set() });
+    f.times++; f.places.add(place(c.run)); if (c.status) f.statuses.add(c.status);
+    if (c.run.created_at < f.first) f.first = c.run.created_at;
+    if (c.run.created_at > f.last) f.last = c.run.created_at;
+    f.url = f.url || c.url;
+  });
+  const fails = Object.values(F).sort((a, b) => b.times - a.times || order(a.site) - order(b.site));
+
+  $("s-runs").textContent = shown.length;
+  $("s-ips").textContent = new Set(shown.map((r) => r.ip).filter(Boolean)).size;
+  $("s-ok").textContent = clicks.length ? pct(okN, clicks.length) + "%" : "–";
+  $("s-ok").style.color = !clicks.length ? "" : okN === clicks.length ? "var(--ok)" : pct(okN, clicks.length) >= 80 ? "#b54708" : "var(--bad)";
+  $("s-ok2").textContent = clicks.length ? ` ${okN}/${clicks.length} điểm` : "";
+  $("s-bad").textContent = fails.length;
+
+  // So sánh link
+  $("links").innerHTML = sites.length ? sites.map((s) => {
+    const rs = runs.filter((r) => r.site === s), cs = rs.flatMap((r) => r.clicks), ok = cs.filter((c) => c.ok).length;
+    const nf = new Set(cs.filter((c) => !c.ok).map((c) => [c.color, c.x, c.y, c.reason].join("|"))).size;
+    const p = pct(ok, cs.length);
+    return `<div class="item"><div class="grow">
+      <div class="row"><b class="grow">${esc(linkName(s))}</b><b class="${p === 100 ? "ok-t" : "bad-t"}">${p}%</b></div>
+      <div class="muted" style="word-break:break-all">${esc(s)}</div>
+      <div class="bar"><i style="width:${p}%;background:${p === 100 ? "var(--ok)" : p >= 80 ? "#b54708" : "var(--bad)"}"></i></div>
+      <div class="muted" style="margin-top:6px">${rs.length} lượt · ${ok}/${cs.length} điểm bấm được · <span class="${nf ? "bad-t" : ""}">${nf} vật phẩm lỗi</span></div>
+    </div></div>`;
+  }).join("") : '<div class="empty">Chưa có dữ liệu</div>';
+
+  // Vật phẩm lỗi
+  $("fails").innerHTML = fails.length ? fails.map((f) => `
+    <div class="item"><div class="sw" style="background:${esc(f.color)}"></div><div class="grow">
+      <div class="row"><b class="grow">${esc(f.color)} · vị trí ${f.x ?? "–"}, ${f.y ?? "–"}</b></div>
+      <span class="tag bad">${esc(reasonText(f.reason))}</span>
+      <span class="muted">gặp ${f.times}/${runsPerSite[f.site] || f.times} lượt</span>
+      <div class="kv">
+        <span>Link</span><span>${esc(linkName(f.site))}</span>
+        <span>Thời gian</span><span>${vnTime(f.first)}${f.first !== f.last ? " – " + vnTime(f.last) : ""}</span>
+        ${f.statuses.size ? `<span>Mã HTTP</span><span>${[...f.statuses].join(", ")}</span>` : ""}
+        <span>Nơi chạy</span><span>${esc([...f.places].join("; "))}</span>
+        ${f.url ? `<span>Trang đích</span><span style="word-break:break-all"><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.url)}</a></span>` : ""}
+      </div>
+    </div></div>`).join("") : `<div class="empty">Không có vật phẩm lỗi${FILTER !== "all" ? " ở link này" : ""} trong ngày</div>`;
+
+  // Từng lượt, chạm để mở
+  $("runs").innerHTML = shown.length ? shown.map((r) => `
+    <details class="run"><summary><div class="grow">
+      <b>${vnTime(r.created_at)}</b> · ${esc(linkName(r.site))}
+      ${r.kind === "selftest" ? '<span class="tag n">trang mẫu</span>' : ""}
+      <div class="muted">${esc(place(r))} · ${esc(r.ip || "")}${r.asn ? " · " + esc(r.asn.replace(/^AS\d+\s*/, "")) : ""}${r.seconds ? " · " + Math.round(r.seconds) + " giây" : ""}</div>
+    </div><span class="tag ${r.ok === r.total ? "ok" : "bad"}">${r.ok}/${r.total}</span></summary>
+    <div style="margin-top:8px">${r.clicks.map((c) => `
+      <div class="pt"><span class="sw" style="background:${esc(c.color)}"></span>
+        <span class="grow">${esc(c.color)} · ${c.x ?? "–"}, ${c.y ?? "–"}</span>
+        <span class="${c.ok ? "ok-t" : "bad-t"}">${c.ok ? "✓ " : "✕ "}${esc(statusText(c))}</span></div>`).join("") || '<div class="muted">Không có điểm bấm</div>'}
+    </div></details>`).join("") : '<div class="empty">Chưa có lượt chạy nào trong ngày này</div>';
+
+  renderTrend();
+  $("csv").href = "/api/csv?day=" + $("day").value;
+}
+
+function renderTrend() {
+  const days = [];
+  for (let i = 13; i >= 0; i--) { const d = new Date(Date.now() + 7 * 3600e3 - i * 864e5); days.push(d.toISOString().slice(0, 10)); }
+  const rows = TREND.filter((t) => FILTER === "all" || t.site === FILTER);
+  const agg = Object.fromEntries(days.map((d) => [d, { n: 0, ok: 0 }]));
+  rows.forEach((t) => { if (agg[t.day]) { agg[t.day].n += t.n; agg[t.day].ok += t.ok; } });
+  $("trend").innerHTML = days.map((d) => {
+    const a = agg[d], p = pct(a.ok, a.n), sel = d === $("day").value;
+    const color = !a.n ? "#e3e1d9" : p === 100 ? "var(--ok)" : p >= 80 ? "#b54708" : "var(--bad)";
+    return `<div title="${d}: ${a.n ? p + "% (" + a.ok + "/" + a.n + ")" : "không chạy"}" data-d="${d}" style="cursor:pointer">
+      <small style="margin:0 0 3px">${a.n ? p : ""}</small>
+      <span style="height:${a.n ? Math.max(4, p) : 4}%;background:${color};${sel ? "outline:2px solid var(--acc);outline-offset:1px" : ""}"></span></div>`;
+  }).join("");
+  $("trend-l").innerHTML = days.map((d, i) => `<div><small>${i % 2 ? "" : d.slice(8) + "/" + d.slice(5, 7)}</small></div>`).join("");
+  const ran = days.filter((d) => agg[d].n);
+  $("trend-note").textContent = ran.length ? `Số trên cột là % điểm bấm được. Chạm vào cột để xem ngày đó.` : "Chưa có dữ liệu 14 ngày gần đây.";
+}
+$("trend").onclick = (e) => { const d = e.target.closest("[data-d]"); if (d) { $("day").value = d.dataset.d; loadData(); } };
+$("chips").onclick = (e) => { const b = e.target.closest("button"); if (b) { FILTER = b.dataset.s; render(); } };
 
 async function loadData() {
   try {
-    const d = await api("/api/data?day=" + $("day").value);
-    const total = d.runs.reduce((a, r) => a + r.total, 0), ok = d.runs.reduce((a, r) => a + r.ok, 0);
-    $("s-runs").textContent = d.runs.length;
-    $("s-ips").textContent = new Set(d.runs.map((r) => r.ip).filter(Boolean)).size;
-    $("s-ok").textContent = total ? ok + "/" + total : "–";
-    $("s-bad").textContent = d.fails.length;
-    $("fails").innerHTML = d.fails.length ? d.fails.map((f) => `
-      <div class="item"><div class="sw" style="background:${esc(f.color)}"></div><div class="grow">
-        ${f.site ? `<div class="muted" style="margin-bottom:2px">${esc(linkLabel(f.site))} · <span style="word-break:break-all">${esc(f.site)}</span></div>` : ""}
-        <b>${esc(f.color)}</b> <span class="muted">· vị trí ${f.x ?? "–"}, ${f.y ?? "–"}</span>
-        ${f.kind === "selftest" ? '<span class="tag n">trang mẫu</span>' : ""}<br>
-        <span class="tag bad">${esc(reasonText(f.reason))}</span> <span class="muted">gặp ${f.times} lần</span>
-        <div class="muted" style="margin-top:4px">${esc((f.places || "").split(",").map((s) => s.trim()).filter(Boolean).join(", "))}</div>
-        ${f.url ? `<a href="${esc(f.url)}" target="_blank" rel="noopener">Mở trang đích</a>` : ""}
-      </div></div>`).join("") : '<div class="empty">Không có vật phẩm lỗi trong ngày này</div>';
-    $("runs").innerHTML = d.runs.length ? d.runs.map((r) => `
-      <div class="item"><div class="grow"><b>${vnTime(r.created_at)}</b> · ${esc([r.city, r.region].filter(Boolean).join(", ") || "Không rõ nơi")}
-        ${r.kind === "selftest" ? '<span class="tag n">trang mẫu</span>' : ""}
-        <div class="muted">${esc(r.ip || "")} ${r.asn ? "· " + esc(r.asn.replace(/^AS\d+\s*/, "")) : ""}</div></div>
-        <div><span class="tag ${r.ok === r.total ? "ok" : "bad"}">${r.ok}/${r.total}</span></div></div>`).join("")
-      : '<div class="empty">Chưa có lượt chạy nào trong ngày này</div>';
+    [DATA, TREND] = await Promise.all([api("/api/data?day=" + $("day").value), api("/api/trend?days=14")]);
+    render();
   } catch (e) { toast(e.message); }
 }
 
@@ -236,7 +365,7 @@ function colorRow(c) {
 $("add-color").onclick = () => $("colors").append(colorRow({ color: "#FF3B30", tolerance: 12, min_area: 30, max: 50 }));
 
 function fillSettings(c) {
-  $("c-enabled").checked = c.enabled; $("c-url").value = (c.urls || []).join("\n"); $("c-wait").value = c.wait_seconds;
+  $("c-enabled").checked = c.enabled; $("c-url").value = (c.urls || []).map((u, i) => ((c.names || [])[i] && !/^Link \d+$/.test(c.names[i]) ? c.names[i] + " " : "") + u).join("\n"); $("c-wait").value = c.wait_seconds;
   $("c-runs").value = c.runs_per_batch; $("run-count").value = c.runs_per_batch;
   $("colors").innerHTML = ""; c.colors.forEach((x) => $("colors").append(colorRow(x)));
   $("hours").querySelectorAll("button").forEach((b) => b.classList.toggle("on", c.run_hours.includes(+b.dataset.h)));
@@ -244,7 +373,8 @@ function fillSettings(c) {
 }
 function readSettings() {
   return {
-    enabled: $("c-enabled").checked, urls: linesOf($("c-url").value), wait_seconds: +$("c-wait").value,
+    enabled: $("c-enabled").checked, urls: parseLinks($("c-url").value).map((l) => l.url),
+    names: parseLinks($("c-url").value).map((l) => l.name), wait_seconds: +$("c-wait").value,
     runs_per_batch: +$("c-runs").value,
     run_hours: [...$("hours").querySelectorAll(".on")].map((b) => +b.dataset.h),
     colors: [...$("colors").children].map((r) => ({ ...r._c,

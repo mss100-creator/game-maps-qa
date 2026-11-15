@@ -1,9 +1,9 @@
 # Kiểm thử game maps – bấm chuột giữa theo màu
 
 Mọi việc làm trên **website quản lý** (dùng tốt trên điện thoại):
-- **Kết quả**: vật phẩm lỗi cần khóa, các lượt chạy, IP và nơi chạy, chọn xem theo ngày.
+- **Kết quả**: lọc theo link, so sánh các link, tỉ lệ bấm được 14 ngày, vật phẩm lỗi (mã HTTP, số lượt gặp, giờ), chi tiết từng điểm bấm của mỗi lượt, tải CSV.
 - **Chạy ngay**: chọn số lượt (1–20) rồi bấm.
-- **Cài đặt**: các link trang bản đồ (mỗi dòng một link, các lượt chạy xoay vòng qua từng link), màu ô vật phẩm, số lượt mỗi đợt, giờ chạy tự động.
+- **Cài đặt**: các link trang bản đồ (mỗi dòng một link, có thể ghi tên phía trước như "Beta https://...", các lượt chạy xoay vòng qua từng link), màu ô vật phẩm, số lượt mỗi đợt, giờ chạy tự động.
 
 Mỗi lượt chạy trên một máy GitHub mới ở Mỹ (IP mới), mở Chrome, tìm các ô màu, bấm chuột giữa từng ô và
 ghi lại tab mới có mở thành công không (bấm lại 1 lần trước khi kết luận lỗi).

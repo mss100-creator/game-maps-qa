@@ -5,6 +5,7 @@ import LOGIN_HTML from "./login.html";
 const DEFAULT_CONFIG = {
   enabled: false,
   urls: [],
+  names: [],
   wait_seconds: 4,
   colors: [{ color: "#2E86DE", tolerance: 12, min_area: 30, max: 50 }],
   runs_per_batch: 20,
@@ -33,19 +34,35 @@ const isRunner = (req, env) => (req.headers.get("authorization") || "") === `Bea
 async function getSetting(env, key, fallback) {
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(key).first();
   const v = row ? JSON.parse(row.value) : fallback;
-  if (key === "config" && v && !Array.isArray(v.urls)) v.urls = v.url ? [v.url] : [];  // cấu hình cũ 1 link
+  if (key === "config" && v) {  // cấu hình cũ: 1 link, chưa có tên
+    if (!Array.isArray(v.urls)) v.urls = v.url ? [v.url] : [];
+    if (!Array.isArray(v.names)) v.names = [];
+    v.names = v.urls.map((_, i) => v.names[i] || "Link " + (i + 1));
+  }
   return v;
 }
 const putSetting = (env, key, value) =>
   env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .bind(key, JSON.stringify(value)).run();
 
+function cleanLinks(c) {
+  const urls = Array.isArray(c.urls) ? c.urls : String(c.url || "").split(/\s+/);
+  const names = Array.isArray(c.names) ? c.names : [];
+  const out = { urls: [], names: [] };
+  urls.forEach((u, i) => {
+    u = String(u).trim().slice(0, 500);
+    if (!/^https?:\/\/\S+$/.test(u) || out.urls.includes(u) || out.urls.length >= 20) return;
+    out.urls.push(u);
+    out.names.push(String(names[i] || "").trim().slice(0, 40) || "Link " + out.urls.length);
+  });
+  return out;
+}
+
 function cleanConfig(c) {
   const n = (v, lo, hi, d) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d);
   return {
     enabled: !!c.enabled,
-    urls: [...new Set((Array.isArray(c.urls) ? c.urls : String(c.url || "").split(/\s+/))
-      .map((u) => String(u).trim()).filter((u) => /^https?:\/\/\S+$/.test(u)).map((u) => u.slice(0, 500)))].slice(0, 20),
+    ...cleanLinks(c),
     wait_seconds: n(c.wait_seconds, 1, 60, 4),
     colors: (Array.isArray(c.colors) ? c.colors : []).slice(0, 12)
       .filter((x) => /^#[0-9a-fA-F]{6}$/.test(x.color || ""))
@@ -89,19 +106,41 @@ async function saveResults(req, env) {
   return json({ saved: clicks.length });
 }
 
+const DAY = "date(r.created_at, '+7 hours')";
+
 async function listData(env, day) {
   const runs = (await env.DB.prepare(
-    `SELECT * FROM runs WHERE date(created_at, '+7 hours') = ? ORDER BY created_at DESC LIMIT 500`
-  ).bind(day).all()).results;
-  const fails = (await env.DB.prepare(
-    `SELECT c.site, c.color, c.x, c.y, c.reason, MAX(c.url) AS url, COUNT(*) AS times,
-            GROUP_CONCAT(DISTINCT COALESCE(r.city, '') || ', ' || COALESCE(r.region, '')) AS places,
-            MAX(r.kind) AS kind
+    `SELECT r.* FROM runs r WHERE ${DAY} = ? ORDER BY r.created_at DESC LIMIT 500`).bind(day).all()).results;
+  const clicks = (await env.DB.prepare(
+    `SELECT c.run_id, c.site, c.color, c.x, c.y, c.ok, c.url, c.status, c.reason
+     FROM clicks c JOIN runs r ON r.id = c.run_id WHERE ${DAY} = ? ORDER BY c.id LIMIT 20000`).bind(day).all()).results;
+  return { day, runs, clicks };
+}
+
+async function trend(env, days) {
+  return (await env.DB.prepare(
+    `SELECT ${DAY} AS day, c.site, COUNT(DISTINCT r.id) AS runs, COUNT(*) AS n, SUM(c.ok) AS ok
      FROM clicks c JOIN runs r ON r.id = c.run_id
-     WHERE c.ok = 0 AND date(r.created_at, '+7 hours') = ?
-     GROUP BY c.site, c.color, c.x, c.y, c.reason ORDER BY times DESC LIMIT 300`
+     WHERE r.created_at >= datetime('now', ?) GROUP BY day, c.site ORDER BY day`
+  ).bind(`-${days} days`).all()).results;
+}
+
+async function csv(env, day) {
+  const rows = (await env.DB.prepare(
+    `SELECT datetime(r.created_at, '+7 hours') AS gio_vn, r.ip, r.city, r.region, r.asn, r.kind,
+            c.site, c.color, c.x, c.y, c.ok, c.status, c.reason, c.url
+     FROM clicks c JOIN runs r ON r.id = c.run_id WHERE ${DAY} = ? ORDER BY r.created_at, c.id`
   ).bind(day).all()).results;
-  return { day, runs, fails };
+  const cfg = await getSetting(env, "config", DEFAULT_CONFIG);
+  const name = (site) => { const i = cfg.urls.indexOf(site); return i >= 0 ? cfg.names[i] : "Trang mẫu"; };
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const head = ["Giờ (VN)", "IP", "Thành phố", "Bang", "Nhà mạng", "Link", "Địa chỉ link", "Màu", "X", "Y",
+    "Kết quả", "HTTP", "Lý do", "Trang đích"];
+  const lines = rows.map((r) => [r.gio_vn, r.ip, r.city, r.region, r.asn, name(r.site), r.site, r.color, r.x, r.y,
+    r.ok ? "Thành công" : "Lỗi", r.status, r.reason, r.url].map(q).join(","));
+  return new Response("\uFEFF" + [head.map(q).join(","), ...lines].join("\r\n"), { headers: {
+    "content-type": "text/csv; charset=utf-8",
+    "content-disposition": `attachment; filename="ket-qua-${day}.csv"` } });
 }
 
 export default {
@@ -147,6 +186,8 @@ export default {
         return json({ ok: true });
       } catch (e) { return json({ error: e.message }, 502); }
     }
+    if (p === "/api/trend") return json(await trend(env, Math.min(60, Math.max(1, +url.searchParams.get("days") || 14))));
+    if (p === "/api/csv") return csv(env, url.searchParams.get("day") || new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10));
     if (p === "/api/data") {
       const day = url.searchParams.get("day") || new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
       return json(await listData(env, day));
