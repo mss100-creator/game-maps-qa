@@ -98,10 +98,16 @@ async function saveResults(req, env) {
       String(body.run_id), w.ip || req.headers.get("cf-connecting-ip"), w.country || cf.country || null,
       w.region || cf.region || null, w.city || cf.city || null, w.org || cf.asOrganization || null,
       body.profile || null, body.selftest ? "selftest" : "real", clicks.length, ok, body.seconds || null),
-    ...clicks.map((c) => env.DB.prepare(
-      `INSERT INTO clicks (run_id, site, color, x, y, ok, url, status, reason) VALUES (?,?,?,?,?,?,?,?,?)`
-    ).bind(String(body.run_id), c.site || null, c.color || null, c.x ?? null, c.y ?? null,
-      c.ok ? 1 : 0, c.url || null, c.status ?? null, c.reason || null)),
+    // Gói Free giới hạn 50 câu lệnh D1 mỗi lần gọi: ghi mọi điểm bấm bằng 1 câu lệnh qua json_each
+    ...(clicks.length ? [env.DB.prepare(
+      `INSERT INTO clicks (run_id, site, color, x, y, ok, url, status, reason)
+       SELECT ?1, json_extract(value, '$.site'), json_extract(value, '$.color'), json_extract(value, '$.x'),
+              json_extract(value, '$.y'), json_extract(value, '$.ok'), json_extract(value, '$.url'),
+              json_extract(value, '$.status'), json_extract(value, '$.reason')
+       FROM json_each(?2)`
+    ).bind(String(body.run_id), JSON.stringify(clicks.map((c) => ({
+      site: c.site || null, color: c.color || null, x: c.x ?? null, y: c.y ?? null, ok: c.ok ? 1 : 0,
+      url: c.url ? String(c.url).slice(0, 1000) : null, status: c.status ?? null, reason: c.reason || null }))))] : []),
   ]);
   return json({ saved: clicks.length });
 }

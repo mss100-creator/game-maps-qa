@@ -46,9 +46,14 @@ Bấm *Chạy thử với trang mẫu* để chắc mọi thứ hoạt động.
 Cloudflare Workers + D1: gói Free. GitHub Actions (repo private): mỗi lượt khoảng 2 phút;
 trang Cài đặt hiện ước tính số phút mỗi tháng và cảnh báo khi vượt 2.000 phút miễn phí.
 
+## Tài liệu kỹ thuật
+- [docs/kien-truc.md](docs/kien-truc.md): thành phần, luồng chạy, dữ liệu, API, bảo mật, giới hạn
+- [docs/trien-khai.md](docs/trien-khai.md): triển khai tự động, bảo trì định kỳ, sao lưu, quay lại bản trước, xử lý sự cố
+
 ## Cấu trúc
 - `worker/` – website quản lý (Cloudflare Worker + D1), tự hẹn giờ chạy theo trang Cài đặt
 - `runner/run.py` – script trình duyệt; đọc cấu hình và gửi kết quả về website
 - `.github/workflows/qa.yml` – chạy các lượt kiểm thử (website kích hoạt)
 - `.github/workflows/deploy.yml` – đưa website lên Cloudflare
+- `docs/` – tài liệu kiến trúc và triển khai
 - `test/` – trang mẫu cho "Chạy thử với trang mẫu"
